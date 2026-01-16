@@ -157,18 +157,16 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     background: linear-gradient(135deg, #FFFAF0 0%, #FFF8DC 50%, #FAEBD7 100%);
-    padding: 30px;
-    position: relative;
+    padding: 20px 30px;
+    overflow: hidden;
 }
 
 /* コード名 */
 .chord-name-container {
-    position: absolute;
-    top: 15px;
-    right: 40px;
-    transform: none;
+    margin-bottom: 10px;
+    text-align: center;
 }
 
 #chord-name {
@@ -186,7 +184,7 @@ body {
     justify-content: center;
     flex: 1;
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
 }
 
 .chord-diagram {

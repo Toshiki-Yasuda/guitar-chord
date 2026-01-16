@@ -25,8 +25,8 @@ const chordData = {
     },
     'F': {
         name: 'F',
-        frets: [1, 1, 2, 3, 3, 1],
-        fingers: [1, 1, 2, 3, 4, 1],
+        frets: [1, 3, 3, 2, 1, 1],
+        fingers: [1, 3, 4, 2, 1, 1],
         startFret: 1,
         barre: { fret: 1, fromString: 6, toString: 1 }
     },
