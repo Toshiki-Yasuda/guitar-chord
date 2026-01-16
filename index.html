@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ギターコード練習アプリ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ギターコード練習</h1>
+            <p class="subtitle">コードボタンをタップしてね！</p>
+        </header>
+
+        <main>
+            <!-- コードダイアグラム表示エリア -->
+            <section class="chord-display">
+                <h2 id="chord-name">C</h2>
+                <div class="chord-diagram" id="chord-diagram">
+                    <!-- SVGでコードダイアグラムを描画 -->
+                </div>
+                <p class="finger-hint" id="finger-hint">指の番号: 1=人差し指, 2=中指, 3=薬指, 4=小指</p>
+            </section>
+
+            <!-- コードボタンエリア -->
+            <section class="chord-buttons">
+                <h3>基本コード</h3>
+                <div class="button-group">
+                    <button class="chord-btn" data-chord="C">C</button>
+                    <button class="chord-btn" data-chord="D">D</button>
+                    <button class="chord-btn" data-chord="E">E</button>
+                    <button class="chord-btn" data-chord="F">F</button>
+                    <button class="chord-btn" data-chord="G">G</button>
+                    <button class="chord-btn" data-chord="A">A</button>
+                </div>
+
+                <h3>マイナーコード</h3>
+                <div class="button-group">
+                    <button class="chord-btn minor" data-chord="Am">Am</button>
+                    <button class="chord-btn minor" data-chord="Dm">Dm</button>
+                    <button class="chord-btn minor" data-chord="Em">Em</button>
+                    <button class="chord-btn minor" data-chord="Bm">Bm</button>
+                </div>
+
+                <h3>セブンスコード</h3>
+                <div class="button-group">
+                    <button class="chord-btn seventh" data-chord="C7">C7</button>
+                    <button class="chord-btn seventh" data-chord="D7">D7</button>
+                    <button class="chord-btn seventh" data-chord="G7">G7</button>
+                    <button class="chord-btn seventh" data-chord="A7">A7</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>咲季ちゃんのギター練習応援アプリ</p>
+        </footer>
+    </div>
+
+    <script src="chords.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
