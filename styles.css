@@ -166,17 +166,17 @@ body {
 /* コード名 */
 .chord-name-container {
     position: absolute;
-    top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 15px;
+    right: 40px;
+    transform: none;
 }
 
 #chord-name {
-    font-size: 6rem;
+    font-size: 5rem;
     font-weight: 900;
     color: #8B4513;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-    letter-spacing: 10px;
+    letter-spacing: 5px;
 }
 
 /* コードダイアグラム */

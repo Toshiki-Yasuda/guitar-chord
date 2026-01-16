@@ -5,12 +5,12 @@ const chordDiagram = document.getElementById('chord-diagram');
 const chordNameDisplay = document.getElementById('chord-name');
 const chordButtons = document.querySelectorAll('.chord-btn');
 
-// 横向きダイアグラムの定数（大きく）
-const DIAGRAM_WIDTH = 900;
-const DIAGRAM_HEIGHT = 500;
-const FRET_SPACING = 150;  // フレット間隔（横方向）
-const STRING_SPACING = 70; // 弦間隔（縦方向）
-const START_X = 80;        // 左端からの開始位置
+// 横向きダイアグラムの定数（もっと大きく！）
+const DIAGRAM_WIDTH = 1100;
+const DIAGRAM_HEIGHT = 580;
+const FRET_SPACING = 180;  // フレット間隔（横方向）
+const STRING_SPACING = 85; // 弦間隔（縦方向）
+const START_X = 120;       // 左端からの開始位置（広めに）
 const START_Y = 80;        // 上端からの開始位置
 const NUM_FRETS = 5;
 const NUM_STRINGS = 6;
@@ -35,7 +35,7 @@ const STRING_COLORS = [
 ];
 
 // 弦の太さ（1弦が細く、6弦が太い）- 反転後
-const STRING_WIDTHS = [2, 2.5, 3.5, 4.5, 5.5, 6.5];
+const STRING_WIDTHS = [2.5, 3, 4, 5.5, 7, 8.5];
 
 // コードダイアグラムをSVGで描画（横向き・アコースティック版）
 function drawChordDiagram(chord) {
@@ -132,22 +132,22 @@ function drawChordDiagram(chord) {
         const toY = START_Y + (barre.fromString - 1) * STRING_SPACING;
 
         const barreRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        barreRect.setAttribute('x', barreX - 18);
-        barreRect.setAttribute('y', Math.min(fromY, toY) - 18);
-        barreRect.setAttribute('width', 36);
-        barreRect.setAttribute('height', Math.abs(toY - fromY) + 36);
-        barreRect.setAttribute('rx', '18');
+        barreRect.setAttribute('x', barreX - 22);
+        barreRect.setAttribute('y', Math.min(fromY, toY) - 22);
+        barreRect.setAttribute('width', 44);
+        barreRect.setAttribute('height', Math.abs(toY - fromY) + 44);
+        barreRect.setAttribute('rx', '22');
         barreRect.setAttribute('fill', FINGER_COLORS[1]);
         barreRect.setAttribute('stroke', '#8B0000');
-        barreRect.setAttribute('stroke-width', '2');
+        barreRect.setAttribute('stroke-width', '3');
         svg.appendChild(barreRect);
 
         // バレーの指番号
         const barreText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         barreText.setAttribute('x', barreX);
-        barreText.setAttribute('y', (fromY + toY) / 2 + 10);
+        barreText.setAttribute('y', (fromY + toY) / 2 + 12);
         barreText.setAttribute('text-anchor', 'middle');
-        barreText.setAttribute('font-size', '28');
+        barreText.setAttribute('font-size', '36');
         barreText.setAttribute('font-weight', 'bold');
         barreText.setAttribute('fill', 'white');
         barreText.textContent = '1';
@@ -165,10 +165,10 @@ function drawChordDiagram(chord) {
         if (fret === -1) {
             // ミュート（×マーク）- 左側に表示
             const mute = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            mute.setAttribute('x', START_X - 40);
-            mute.setAttribute('y', y + 12);
+            mute.setAttribute('x', START_X - 55);
+            mute.setAttribute('y', y + 16);
             mute.setAttribute('text-anchor', 'middle');
-            mute.setAttribute('font-size', '36');
+            mute.setAttribute('font-size', '48');
             mute.setAttribute('font-weight', 'bold');
             mute.setAttribute('fill', '#DC143C');
             mute.textContent = '×';
@@ -176,12 +176,12 @@ function drawChordDiagram(chord) {
         } else if (fret === 0) {
             // 開放弦（○マーク）- 左側に表示
             const open = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            open.setAttribute('cx', START_X - 40);
+            open.setAttribute('cx', START_X - 55);
             open.setAttribute('cy', y);
-            open.setAttribute('r', '16');
+            open.setAttribute('r', '20');
             open.setAttribute('fill', 'none');
             open.setAttribute('stroke', '#228B22');
-            open.setAttribute('stroke-width', '4');
+            open.setAttribute('stroke-width', '5');
             svg.appendChild(open);
         } else {
             // フレットを押さえる位置
@@ -192,22 +192,22 @@ function drawChordDiagram(chord) {
 
             const x = START_X + (fret - data.startFret + 0.5) * FRET_SPACING;
 
-            // 指の丸（大きく！）
+            // 指の丸（もっと大きく！）
             const fingerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             fingerCircle.setAttribute('cx', x);
             fingerCircle.setAttribute('cy', y);
-            fingerCircle.setAttribute('r', '28');
+            fingerCircle.setAttribute('r', '35');
             fingerCircle.setAttribute('fill', FINGER_COLORS[finger] || '#666');
             fingerCircle.setAttribute('stroke', 'white');
-            fingerCircle.setAttribute('stroke-width', '3');
+            fingerCircle.setAttribute('stroke-width', '4');
             svg.appendChild(fingerCircle);
 
-            // 指番号（大きく！）
+            // 指番号（もっと大きく！）
             const fingerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             fingerText.setAttribute('x', x);
-            fingerText.setAttribute('y', y + 12);
+            fingerText.setAttribute('y', y + 14);
             fingerText.setAttribute('text-anchor', 'middle');
-            fingerText.setAttribute('font-size', '32');
+            fingerText.setAttribute('font-size', '40');
             fingerText.setAttribute('font-weight', 'bold');
             fingerText.setAttribute('fill', 'white');
             fingerText.textContent = finger;
@@ -219,10 +219,10 @@ function drawChordDiagram(chord) {
     const stringNames = ['1弦', '2弦', '3弦', '4弦', '5弦', '6弦'];
     for (let i = 0; i < NUM_STRINGS; i++) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', START_X + NUM_FRETS * FRET_SPACING + 50);
-        label.setAttribute('y', START_Y + i * STRING_SPACING + 8);
+        label.setAttribute('x', START_X + NUM_FRETS * FRET_SPACING + 40);
+        label.setAttribute('y', START_Y + i * STRING_SPACING + 10);
         label.setAttribute('text-anchor', 'start');
-        label.setAttribute('font-size', '22');
+        label.setAttribute('font-size', '26');
         label.setAttribute('font-weight', 'bold');
         label.setAttribute('fill', '#8B4513');
         label.textContent = stringNames[i];
