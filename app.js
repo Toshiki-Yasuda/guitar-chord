@@ -5,8 +5,11 @@ const chordDiagram = document.getElementById('chord-diagram');
 const chordNameDisplay = document.getElementById('chord-name');
 const chordButtons = document.querySelectorAll('.chord-btn');
 
+// 選択中のアルペジオパターン
+let selectedArpeggioPattern = null;
+
 // 横向きダイアグラムの定数（もっと大きく！）
-const DIAGRAM_WIDTH = 1100;
+const DIAGRAM_WIDTH = 1180;
 const DIAGRAM_HEIGHT = 580;
 const FRET_SPACING = 180;  // フレット間隔（横方向）
 const STRING_SPACING = 85; // 弦間隔（縦方向）
@@ -15,12 +18,20 @@ const START_Y = 80;        // 上端からの開始位置
 const NUM_FRETS = 5;
 const NUM_STRINGS = 6;
 
-// 指の色（見やすい色）
+// 指の色（パステルカラー）
 const FINGER_COLORS = {
-    1: '#DC143C', // 人差し指 - クリムゾン
-    2: '#228B22', // 中指 - フォレストグリーン
-    3: '#4169E1', // 薬指 - ロイヤルブルー
-    4: '#9932CC'  // 小指 - ダークオーキッド
+    1: '#E8A0A0', // 人差し指 - 淡いピンク
+    2: '#90C090', // 中指 - 淡いグリーン
+    3: '#A0B8E0', // 薬指 - 淡いブルー
+    4: '#C8A8D8'  // 小指 - 淡いパープル
+};
+
+// 指番号の文字色（濃い色で見やすく）
+const FINGER_TEXT_COLORS = {
+    1: '#8B3030', // 人差し指 - 濃いピンク
+    2: '#2E6B2E', // 中指 - 濃いグリーン
+    3: '#3B5998', // 薬指 - 濃いブルー
+    4: '#6B3A8B'  // 小指 - 濃いパープル
 };
 
 // アコースティックギターの弦の色（巻き弦とプレーン弦）
@@ -149,7 +160,7 @@ function drawChordDiagram(chord) {
         barreText.setAttribute('text-anchor', 'middle');
         barreText.setAttribute('font-size', '36');
         barreText.setAttribute('font-weight', 'bold');
-        barreText.setAttribute('fill', 'white');
+        barreText.setAttribute('fill', FINGER_TEXT_COLORS[1]);
         barreText.textContent = '1';
         svg.appendChild(barreText);
     }
@@ -209,7 +220,7 @@ function drawChordDiagram(chord) {
             fingerText.setAttribute('text-anchor', 'middle');
             fingerText.setAttribute('font-size', '40');
             fingerText.setAttribute('font-weight', 'bold');
-            fingerText.setAttribute('fill', 'white');
+            fingerText.setAttribute('fill', FINGER_TEXT_COLORS[finger] || '#333');
             fingerText.textContent = finger;
             svg.appendChild(fingerText);
         }
@@ -219,7 +230,7 @@ function drawChordDiagram(chord) {
     const stringNames = ['1弦', '2弦', '3弦', '4弦', '5弦', '6弦'];
     for (let i = 0; i < NUM_STRINGS; i++) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', START_X + NUM_FRETS * FRET_SPACING + 40);
+        label.setAttribute('x', START_X + NUM_FRETS * FRET_SPACING + 70);
         label.setAttribute('y', START_Y + i * STRING_SPACING + 10);
         label.setAttribute('text-anchor', 'start');
         label.setAttribute('font-size', '26');
@@ -235,7 +246,7 @@ function drawChordDiagram(chord) {
 }
 
 // コードを表示する
-function displayChord(chord) {
+function displayChord(chord, playSound = true) {
     // コード名を更新
     chordNameDisplay.textContent = chord;
 
@@ -249,10 +260,39 @@ function displayChord(chord) {
             btn.classList.add('active');
         }
     });
+
+    // 音を再生
+    if (playSound) {
+        playChord(chord);
+    }
 }
 
 // ボタンクリックイベントの設定
 chordButtons.forEach(button => {
+    // 右上ゾーン（アルペジオ再生）
+    const zoneRightTop = button.querySelector('.zone-right-top');
+    if (zoneRightTop) {
+        zoneRightTop.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const chord = button.dataset.chord;
+            displayChord(chord, false); // 音なしで表示
+            // 選択中のアルペジオパターンがあればそれを使用、なければ'up'
+            const pattern = selectedArpeggioPattern || 'up';
+            playArpeggio(chord, pattern);
+        });
+    }
+
+    // 右下ゾーン（コード進行に追加）
+    const zoneRightBottom = button.querySelector('.zone-right-bottom');
+    if (zoneRightBottom) {
+        zoneRightBottom.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const chord = button.dataset.chord;
+            addChordToProgression(chord);
+        });
+    }
+
+    // 左半分（通常の楽譜セット）
     button.addEventListener('click', () => {
         const chord = button.dataset.chord;
         displayChord(chord);
@@ -272,5 +312,398 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// 初期表示
-displayChord('C');
+// Web Audio API でコード音を再生（倍音＋フィルター版）
+let audioContext = null;
+
+// 各弦の開放弦の周波数（Hz）- 標準チューニング
+const OPEN_STRING_FREQUENCIES = [
+    329.63, // 1弦 E4
+    246.94, // 2弦 B3
+    196.00, // 3弦 G3
+    146.83, // 4弦 D3
+    110.00, // 5弦 A2
+    82.41   // 6弦 E2
+];
+
+// 倍音の構成（倍率と音量比）- ギターらしい倍音構造
+const HARMONICS = [
+    { ratio: 1, gain: 1.0 },    // 基音
+    { ratio: 2, gain: 0.5 },    // 2倍音
+    { ratio: 3, gain: 0.25 },   // 3倍音
+    { ratio: 4, gain: 0.125 },  // 4倍音
+];
+
+// フレットによる周波数計算（半音上がるごとに2^(1/12)倍）
+function getFrequency(stringIndex, fret) {
+    if (fret < 0) return null; // ミュート
+    const openFreq = OPEN_STRING_FREQUENCIES[stringIndex];
+    return openFreq * Math.pow(2, fret / 12);
+}
+
+// 1本の弦の音を生成（倍音付き）
+function playString(freq, startTime, stringIndex) {
+    // マスターゲイン（この弦全体の音量）
+    const masterGain = audioContext.createGain();
+
+    // ローパスフィルター（ギターボディの共鳴を模倣）
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2500, startTime); // カットオフ周波数
+    filter.Q.setValueAtTime(1, startTime); // レゾナンス
+
+    // フィルターの減衰（時間とともに高音が減る＝よりリアル）
+    filter.frequency.exponentialRampToValueAtTime(800, startTime + 2.0);
+
+    const duration = 2.5; // 音の長さ
+
+    // 弦の太さによる音量調整（低音弦はやや大きく）
+    const stringVolume = 0.15 + (5 - stringIndex) * 0.02;
+
+    // 各倍音を生成
+    HARMONICS.forEach((harmonic, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        // 波形の選択（倍音ごとに少し変える）
+        oscillator.type = index === 0 ? 'triangle' : 'sine';
+        oscillator.frequency.setValueAtTime(freq * harmonic.ratio, startTime);
+
+        // 各倍音の音量エンベロープ
+        const harmonicGain = stringVolume * harmonic.gain;
+        gainNode.gain.setValueAtTime(0, startTime);
+        // アタック（急速に立ち上がる）
+        gainNode.gain.linearRampToValueAtTime(harmonicGain, startTime + 0.005);
+        // 初期ディケイ（弦を弾いた直後の急速な減衰）
+        gainNode.gain.exponentialRampToValueAtTime(harmonicGain * 0.7, startTime + 0.1);
+        // サステイン〜リリース（ゆっくり減衰）
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        // 接続: オシレーター → ゲイン → フィルター → マスターゲイン
+        oscillator.connect(gainNode);
+        gainNode.connect(filter);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+    });
+
+    // フィルター → マスターゲイン → 出力
+    filter.connect(masterGain);
+    masterGain.connect(audioContext.destination);
+
+    // マスターゲインのエンベロープ
+    masterGain.gain.setValueAtTime(1, startTime);
+    masterGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+}
+
+// コードを再生
+function playChord(chordName) {
+    const data = chordData[chordName];
+    if (!data) return;
+
+    // AudioContextを初期化（ユーザー操作後に初期化が必要）
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const now = audioContext.currentTime;
+    const strumDelay = 0.025; // 弦をかき鳴らす間隔（秒）
+
+    // 各弦の音を生成（6弦から1弦へストローク）
+    for (let i = 5; i >= 0; i--) {
+        const fret = data.frets[5 - i]; // データは6弦から順
+        const freq = getFrequency(i, fret);
+
+        if (freq === null) continue; // ミュートの弦はスキップ
+
+        const startTime = now + (5 - i) * strumDelay;
+        playString(freq, startTime, i);
+    }
+
+}
+
+// アルペジオパターンの定義
+const ARPEGGIO_PATTERNS = {
+    // 1. 上昇: 6弦→1弦（低音から高音へ）
+    up: (validStrings) => validStrings,
+
+    // 2. 下降: 1弦→6弦（高音から低音へ）
+    down: (validStrings) => [...validStrings].reverse(),
+
+    // 3. 往復: 上昇→下降
+    updown: (validStrings) => {
+        const reversed = [...validStrings].reverse().slice(1);
+        return [...validStrings, ...reversed];
+    },
+
+    // 4. ピンチ: ベース音と高音を交互に
+    pinch: (validStrings) => {
+        const result = [];
+        const len = validStrings.length;
+        const half = Math.ceil(len / 2);
+        for (let i = 0; i < half; i++) {
+            result.push(validStrings[i]);
+            if (len - 1 - i > i) {
+                result.push(validStrings[len - 1 - i]);
+            }
+        }
+        return result;
+    },
+
+    // 5. スリーフィンガー: クラシックギターの基本（ベース-中-高-中 を繰り返し）
+    threefinger: (validStrings) => {
+        if (validStrings.length < 3) return validStrings;
+        const bass = validStrings[0]; // 最低音
+        const mid = validStrings[Math.floor(validStrings.length / 2)]; // 中間
+        const high = validStrings[validStrings.length - 1]; // 最高音
+        return [bass, mid, high, mid, bass, mid, high, mid];
+    },
+
+    // 6. フォーフィンガー: 4本指パターン（ベース-3-2-1 を繰り返し）
+    fourfinger: (validStrings) => {
+        if (validStrings.length < 4) return validStrings;
+        const bass = validStrings[0];
+        const s3 = validStrings[Math.floor(validStrings.length * 0.5)];
+        const s2 = validStrings[Math.floor(validStrings.length * 0.75)];
+        const s1 = validStrings[validStrings.length - 1];
+        return [bass, s3, s2, s1, bass, s3, s2, s1];
+    },
+
+    // 7. トラビス: カントリー/フォーク（交互ベース + 高音弦）
+    travis: (validStrings) => {
+        if (validStrings.length < 4) return validStrings;
+        const bass1 = validStrings[0]; // 6弦側ベース
+        const bass2 = validStrings[Math.min(1, validStrings.length - 1)]; // 5弦側ベース
+        const high1 = validStrings[validStrings.length - 1]; // 1弦
+        const high2 = validStrings[Math.max(0, validStrings.length - 2)]; // 2弦
+        return [bass1, high2, bass2, high1, bass1, high2, bass2, high1];
+    },
+
+    // 8. ロール: 連続ロール（中間から高音へ、戻る）
+    roll: (validStrings) => {
+        if (validStrings.length < 4) return validStrings;
+        const mid = Math.floor(validStrings.length / 2);
+        const upPart = validStrings.slice(mid); // 中間から高音
+        const downPart = [...upPart].reverse().slice(1); // 戻り
+        return [...upPart, ...downPart, ...upPart, ...downPart];
+    },
+
+    // 9. カスケード: 流れるパターン（1つ飛ばしで弾く）
+    cascade: (validStrings) => {
+        const result = [];
+        // 偶数インデックス（0,2,4...）を先に
+        for (let i = 0; i < validStrings.length; i += 2) {
+            result.push(validStrings[i]);
+        }
+        // 奇数インデックス（1,3,5...）を後に
+        for (let i = 1; i < validStrings.length; i += 2) {
+            result.push(validStrings[i]);
+        }
+        return result;
+    },
+
+    // 10. ランダム: ランダムな順番
+    random: (validStrings) => {
+        const shuffled = [...validStrings];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+};
+
+// アルペジオでコードを再生
+function playArpeggio(chordName, pattern = 'up', button = null) {
+    const data = chordData[chordName];
+    if (!data) return;
+
+    // AudioContextを初期化
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // 有効な弦のデータを収集（6弦から1弦の順）
+    const validStrings = [];
+    for (let i = 5; i >= 0; i--) {
+        const fret = data.frets[5 - i];
+        const freq = getFrequency(i, fret);
+        if (freq !== null) {
+            validStrings.push({ stringIndex: i, freq: freq });
+        }
+    }
+
+    // パターンに応じて弦の順序を決定
+    const patternFunc = ARPEGGIO_PATTERNS[pattern] || ARPEGGIO_PATTERNS.up;
+    const playOrder = patternFunc(validStrings);
+
+    const now = audioContext.currentTime;
+    const arpeggioDelay = 0.3; // アルペジオの間隔
+
+    // 各弦の音を生成
+    playOrder.forEach((stringData, index) => {
+        const startTime = now + index * arpeggioDelay;
+        playString(stringData.freq, startTime, stringData.stringIndex);
+    });
+
+    // ボタンのアニメーション
+    if (button) {
+        button.classList.add('playing');
+        setTimeout(() => button.classList.remove('playing'), playOrder.length * arpeggioDelay * 1000 + 300);
+    }
+}
+
+// アルペジオボタンのイベント
+const arpeggioButtons = document.querySelectorAll('.arpeggio-btn');
+arpeggioButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const pattern = btn.dataset.pattern;
+
+        // 既に選択されている場合は解除
+        if (selectedArpeggioPattern === pattern) {
+            selectedArpeggioPattern = null;
+            btn.classList.remove('selected');
+        } else {
+            // 他のボタンの選択を解除
+            arpeggioButtons.forEach(b => b.classList.remove('selected'));
+            // このボタンを選択
+            selectedArpeggioPattern = pattern;
+            btn.classList.add('selected');
+        }
+
+        // 現在のコードでアルペジオ再生
+        const currentChord = chordNameDisplay.textContent;
+        playArpeggio(currentChord, pattern, btn);
+    });
+});
+
+// 初期表示（音は鳴らさない）
+displayChord('C', false);
+
+// ========================================
+// コード進行機能
+// ========================================
+
+// コード進行リスト
+let chordProgression = [];
+let isPlayingProgression = false;
+let progressionTimeouts = [];
+let playbackSpeed = 1.5; // 秒
+
+// DOM要素
+const progressionList = document.getElementById('progression-list');
+const playProgressionBtn = document.getElementById('play-progression-btn');
+const stopProgressionBtn = document.getElementById('stop-progression-btn');
+const clearProgressionBtn = document.getElementById('clear-progression-btn');
+const speedSlider = document.getElementById('speed-slider');
+const speedValue = document.getElementById('speed-value');
+
+// コード進行にコードを追加
+function addChordToProgression(chord) {
+    chordProgression.push(chord);
+    renderProgressionList();
+}
+
+// コード進行からコードを削除
+function removeChordFromProgression(index) {
+    chordProgression.splice(index, 1);
+    renderProgressionList();
+}
+
+// コード進行リストを描画
+function renderProgressionList() {
+    progressionList.innerHTML = '';
+
+    chordProgression.forEach((chord, index) => {
+        const item = document.createElement('div');
+        item.className = 'progression-item';
+        item.dataset.index = index;
+
+        const label = document.createElement('span');
+        label.className = 'chord-label';
+        label.textContent = chord;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeChordFromProgression(index);
+        });
+
+        item.appendChild(label);
+        item.appendChild(removeBtn);
+
+        // クリックでそのコードを表示
+        item.addEventListener('click', () => {
+            displayChord(chord);
+        });
+
+        progressionList.appendChild(item);
+    });
+}
+
+// コード進行を再生
+async function playProgression() {
+    if (chordProgression.length === 0) return;
+    if (isPlayingProgression) return;
+
+    isPlayingProgression = true;
+    playProgressionBtn.classList.add('playing');
+    playProgressionBtn.textContent = '▶ 再生中...';
+
+    const items = progressionList.querySelectorAll('.progression-item');
+
+    for (let i = 0; i < chordProgression.length; i++) {
+        if (!isPlayingProgression) break;
+
+        const chord = chordProgression[i];
+
+        // 現在再生中のアイテムをハイライト
+        items.forEach(item => item.classList.remove('playing'));
+        if (items[i]) items[i].classList.add('playing');
+
+        // コードを表示して再生
+        displayChord(chord);
+
+        // 次のコードまで待機（速度設定に基づく）
+        await new Promise(resolve => {
+            const timeout = setTimeout(resolve, playbackSpeed * 1000);
+            progressionTimeouts.push(timeout);
+        });
+    }
+
+    stopProgression();
+}
+
+// コード進行を停止
+function stopProgression() {
+    isPlayingProgression = false;
+    playProgressionBtn.classList.remove('playing');
+    playProgressionBtn.textContent = '▶ 再生';
+
+    // タイムアウトをクリア
+    progressionTimeouts.forEach(timeout => clearTimeout(timeout));
+    progressionTimeouts = [];
+
+    // ハイライトを解除
+    const items = progressionList.querySelectorAll('.progression-item');
+    items.forEach(item => item.classList.remove('playing'));
+}
+
+// コード進行をクリア
+function clearProgression() {
+    stopProgression();
+    chordProgression = [];
+    renderProgressionList();
+}
+
+// イベントリスナー
+playProgressionBtn.addEventListener('click', playProgression);
+stopProgressionBtn.addEventListener('click', stopProgression);
+clearProgressionBtn.addEventListener('click', clearProgression);
+
+// 速度スライダー
+speedSlider.addEventListener('input', () => {
+    playbackSpeed = parseFloat(speedSlider.value);
+    speedValue.textContent = playbackSpeed.toFixed(1) + '秒';
+});
